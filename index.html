@@ -20,18 +20,21 @@
             border-radius: 8px; 
             box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
         }
+        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
         button { 
+            flex: 1;
             background-color: #3498db; 
             color: white; 
             border: none; 
-            padding: 12px 20px; 
+            padding: 12px; 
             border-radius: 5px; 
             cursor: pointer; 
             font-size: 16px; 
-            width: 100%;
             transition: background 0.3s;
         }
         button:hover { background-color: #2980b9; }
+        #recordBtn { background-color: #e74c3c; }
+        #recordBtn:hover { background-color: #c0392b; }
         .script-box { 
             font-size: 18px; 
             line-height: 1.6; 
@@ -50,6 +53,15 @@
             border: 1px solid #ccc;
         }
         .instruction { font-size: 14px; color: #7f8c8d; margin-bottom: 20px; }
+        #result-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f8f5;
+            border-radius: 5px;
+            border-left: 5px solid #1abc9c;
+            display: none;
+        }
+        .score { font-size: 24px; font-weight: bold; color: #16a085; }
     </style>
 </head>
 <body>
@@ -70,7 +82,16 @@
             Let the water settle. The path to the past. You are drifting deeper and further.
         </div>
 
-        <button onclick="playAudio()">🎧 听纯正英音示范</button>
+        <div class="btn-group">
+            <button onclick="playAudio()">🎧 听示范</button>
+            <button id="recordBtn" onclick="startRecording()">🎤 点击跟读并打分</button>
+        </div>
+
+        <div id="result-box">
+            <p><strong>你读出的是：</strong> <span id="user-transcript"></span></p>
+            <p><strong>发音匹配度：</strong> <span class="score" id="user-score">0%</span></p>
+            <p style="font-size: 14px; color: #7f8c8d;">(匹配度越低，说明系统越听不懂你的某些单词，请重点对比示范音频调整口型)</p>
+        </div>
     </div>
 
     <script>
@@ -84,56 +105,31 @@
                 instruction: "注意语流：用腹式呼吸，语速放缓，音调向下走，字与字之间连贯但辅音清晰。"
             },
             brainwaves: {
-                text: "Welcome to Master Your Brainwaves™. Today, we will structurally recalibrate your cognitive frequencies. By understanding your neurological baseline, you take absolute control of your professional trajectory.",
+                text: "Welcome to Master Your Brainwaves. Today, we will structurally recalibrate your cognitive frequencies. By understanding your neurological baseline, you take absolute control of your professional trajectory.",
                 instruction: "注意气场：音色明亮，在长单词 (structurally/neurological) 的重音上加码，展现学术与专业权威感。"
             }
         };
+
+        let recognition;
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-GB'; // 强制设定为英式发音识别
+        } else {
+            alert("你的浏览器不支持语音识别，请使用最新版 Chrome 或 Edge 浏览器。");
+        }
 
         function updateScript() {
             const mode = document.getElementById('mode').value;
             document.getElementById('script-display').innerText = content[mode].text;
             document.getElementById('instruction-display').innerText = content[mode].instruction;
+            document.getElementById('result-box').style.display = 'none';
         }
 
         function playAudio() {
-            // 停止当前可能正在播放的语音
             window.speechSynthesis.cancel();
-
             const text = document.getElementById('script-display').innerText;
             const utterance = new SpeechSynthesisUtterance(text);
-            
-            // 筛选浏览器内置的英式英语声音 (en-GB)
             const voices = speechSynthesis.getVoices();
-            const britishVoice = voices.find(voice => voice.lang === 'en-GB' || voice.name.includes('UK') || voice.name.includes('British'));
-            
-            if (britishVoice) {
-                utterance.voice = britishVoice;
-            } else {
-                alert("您的浏览器似乎没有安装英式发音引擎，将使用默认发音。");
-            }
-            
-            // 根据不同场景动态调整参数
-            const mode = document.getElementById('mode').value;
-            if (mode === 'qhht') {
-                utterance.rate = 0.75; // 慢速
-                utterance.pitch = 0.8; // 低沉
-            } else if (mode === 'brainwaves') {
-                utterance.rate = 0.95; // 正常偏慢，显稳重
-                utterance.pitch = 1.0; // 正常音调
-            } else {
-                utterance.rate = 0.9;
-                utterance.pitch = 1.0;
-            }
-
-            speechSynthesis.speak(utterance);
-        }
-
-        // 初始化加载声音列表（解决 Chrome 语音加载延迟的问题）
-        if (speechSynthesis.onvoiceschanged !== undefined) {
-            speechSynthesis.onvoiceschanged = function() {
-                speechSynthesis.getVoices();
-            };
-        }
-    </script>
-</body>
-</html>
+            const britishVoice = voices.find(voice => voice.lang === 'en-GB' ||
