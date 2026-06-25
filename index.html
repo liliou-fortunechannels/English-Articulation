@@ -83,14 +83,14 @@
         </div>
 
         <div class="btn-group">
-            <button onclick="playAudio()">🎧 听示范</button>
+            <button id="playBtn" onclick="playAudio()">🎧 听示范</button>
             <button id="recordBtn" onclick="startRecording()">🎤 点击跟读并打分</button>
         </div>
 
         <div id="result-box">
             <p><strong>你读出的是：</strong> <span id="user-transcript"></span></p>
             <p><strong>发音匹配度：</strong> <span class="score" id="user-score">0%</span></p>
-            <p style="font-size: 14px; color: #7f8c8d;">(匹配度越低，说明系统越听不懂你的某些单词，请重点对比示范音频调整口型)</p>
+            <p style="font-size: 14px; color: #7f8c8d;">(如果没读完，请语速稍微加快一点点)</p>
         </div>
     </div>
 
@@ -115,9 +115,7 @@
             recognition = new webkitSpeechRecognition();
             recognition.continuous = false;
             recognition.interimResults = false;
-            recognition.lang = 'en-GB'; // 强制设定为英式发音识别
-        } else {
-            alert("你的浏览器不支持语音识别，请使用最新版 Chrome 或 Edge 浏览器。");
+            recognition.lang = 'en-GB'; 
         }
 
         function updateScript() {
@@ -127,9 +125,113 @@
             document.getElementById('result-box').style.display = 'none';
         }
 
+        // --- 核心修复区：语音播放逻辑 ---
         function playAudio() {
+            if (!('speechSynthesis' in window)) {
+                alert("抱歉，你的浏览器不支持语音合成功能。");
+                return;
+            }
+
+            // 修复 Chrome 引擎卡死 bug：先唤醒，再清空队列
+            window.speechSynthesis.resume();
             window.speechSynthesis.cancel();
+
             const text = document.getElementById('script-display').innerText;
             const utterance = new SpeechSynthesisUtterance(text);
-            const voices = speechSynthesis.getVoices();
-            const britishVoice = voices.find(voice => voice.lang === 'en-GB' ||
+            
+            // 修复中英文引擎冲突：强制声明这是一段英语，且为英音
+            utterance.lang = 'en-GB'; 
+
+            // 尝试寻找更纯正的英式发音人
+            const voices = window.speechSynthesis.getVoices();
+            const britishVoice = voices.find(voice => voice.lang === 'en-GB' || voice.name.includes('UK') || voice.name.includes('British'));
+            if (britishVoice) {
+                utterance.voice = britishVoice;
+            }
+
+            const mode = document.getElementById('mode').value;
+            utterance.rate = mode === 'qhht' ? 0.75 : (mode === 'brainwaves' ? 0.95 : 0.9);
+            utterance.pitch = mode === 'qhht' ? 0.8 : 1.0;
+
+            const playBtn = document.getElementById('playBtn');
+            utterance.onstart = function() {
+                playBtn.innerText = "🔊 正在播放...";
+                playBtn.style.backgroundColor = "#27ae60";
+            };
+            utterance.onend = function() {
+                playBtn.innerText = "🎧 听示范";
+                playBtn.style.backgroundColor = "#3498db";
+            };
+            utterance.onerror = function(event) {
+                console.error("播放报错:", event);
+                alert("播放失败，请刷新网页重试。");
+                playBtn.innerText = "🎧 听示范";
+                playBtn.style.backgroundColor = "#3498db";
+            };
+
+            window.speechSynthesis.speak(utterance);
+        }
+        // --- 修复区结束 ---
+
+        function cleanText(text) {
+            return text.toLowerCase().replace(/[.,!?'™]/g, '').trim().split(/\s+/);
+        }
+
+        function startRecording() {
+            if (!recognition) {
+                alert("你的浏览器不支持录音打分功能，请使用最新版 Chrome。");
+                return;
+            }
+            
+            // 录音时停止播放
+            window.speechSynthesis.cancel();
+
+            const btn = document.getElementById('recordBtn');
+            btn.innerText = "🎙️ 正在聆听... (请说话)";
+            btn.style.backgroundColor = "#e67e22";
+
+            recognition.start();
+
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('user-transcript').innerText = transcript;
+                
+                const targetText = document.getElementById('script-display').innerText;
+                const targetWords = cleanText(targetText);
+                const userWords = cleanText(transcript);
+                
+                let matchCount = 0;
+                userWords.forEach(word => {
+                    if (targetWords.includes(word)) matchCount++;
+                });
+
+                let score = Math.min(100, Math.round((matchCount / targetWords.length) * 100));
+                
+                document.getElementById('user-score').innerText = score + "%";
+                document.getElementById('result-box').style.display = 'block';
+            };
+
+            recognition.onspeechend = function() {
+                recognition.stop();
+                resetBtn();
+            };
+
+            recognition.onerror = function(event) {
+                alert("录音出错：" + event.error + " (请确保网页已允许麦克风权限)");
+                resetBtn();
+            };
+        }
+
+        function resetBtn() {
+            const btn = document.getElementById('recordBtn');
+            btn.innerText = "🎤 点击跟读并打分";
+            btn.style.backgroundColor = "#e74c3c";
+        }
+
+        // 预加载语音包 (解决首次点击无声问题)
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = function() { window.speechSynthesis.getVoices(); };
+        }
+    </script>
+</body>
+</html>
