@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Resonance Articulation Game</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 600px; 
+            margin: 40px auto; 
+            padding: 20px; 
+            background-color: #f4f4f9; 
+            color: #333; 
+        }
+        h1 { color: #2c3e50; text-align: center; }
+        .card { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+        }
+        button { 
+            background-color: #3498db; 
+            color: white; 
+            border: none; 
+            padding: 12px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            width: 100%;
+            transition: background 0.3s;
+        }
+        button:hover { background-color: #2980b9; }
+        .script-box { 
+            font-size: 18px; 
+            line-height: 1.6; 
+            background: #ecf0f1; 
+            padding: 20px; 
+            border-left: 5px solid #3498db; 
+            margin: 20px 0; 
+            min-height: 100px;
+        }
+        select { 
+            padding: 10px; 
+            font-size: 16px; 
+            width: 100%; 
+            margin-bottom: 10px; 
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        .instruction { font-size: 14px; color: #7f8c8d; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Resonance Articulation</h1>
+    <div class="card">
+        <label for="mode"><strong>选择训练关卡：</strong></label>
+        <select id="mode" onchange="updateScript()">
+            <option value="warmup">Level 1: 发音肌肉热身 (清晰度训练)</option>
+            <option value="qhht">Level 2: QHHT 引导 (平稳、降调、慢速)</option>
+            <option value="brainwaves">Level 3: Master Your Brainwaves™ (权威、重音)</option>
+        </select>
+
+        <div class="instruction" id="instruction-display">
+            注意发音：干脆的 'T' 音，宽阔的 'A' 音，以及词尾不卷舌的 'R'。
+        </div>
+
+        <div id="script-display" class="script-box">
+            Let the water settle. The path to the past. You are drifting deeper and further.
+        </div>
+
+        <button onclick="playAudio()">🎧 听纯正英音示范</button>
+    </div>
+
+    <script>
+        const content = {
+            warmup: {
+                text: "Let the water settle. The path to the past. You are drifting deeper and further.",
+                instruction: "注意发音：干脆的 'T' 音 (water/settle)，宽阔的 'A' 音 (path/past)，以及词尾不卷舌的 'R' (deeper/further)。"
+            },
+            qhht: {
+                text: "As you drift deeper into this space... notice how effortlessly your mind expands. Letting go of the conscious chatter... stepping into the vastness of your own inner wisdom.",
+                instruction: "注意语流：用腹式呼吸，语速放缓，音调向下走，字与字之间连贯但辅音清晰。"
+            },
+            brainwaves: {
+                text: "Welcome to Master Your Brainwaves™. Today, we will structurally recalibrate your cognitive frequencies. By understanding your neurological baseline, you take absolute control of your professional trajectory.",
+                instruction: "注意气场：音色明亮，在长单词 (structurally/neurological) 的重音上加码，展现学术与专业权威感。"
+            }
+        };
+
+        function updateScript() {
+            const mode = document.getElementById('mode').value;
+            document.getElementById('script-display').innerText = content[mode].text;
+            document.getElementById('instruction-display').innerText = content[mode].instruction;
+        }
+
+        function playAudio() {
+            // 停止当前可能正在播放的语音
+            window.speechSynthesis.cancel();
+
+            const text = document.getElementById('script-display').innerText;
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            // 筛选浏览器内置的英式英语声音 (en-GB)
+            const voices = speechSynthesis.getVoices();
+            const britishVoice = voices.find(voice => voice.lang === 'en-GB' || voice.name.includes('UK') || voice.name.includes('British'));
+            
+            if (britishVoice) {
+                utterance.voice = britishVoice;
+            } else {
+                alert("您的浏览器似乎没有安装英式发音引擎，将使用默认发音。");
+            }
+            
+            // 根据不同场景动态调整参数
+            const mode = document.getElementById('mode').value;
+            if (mode === 'qhht') {
+                utterance.rate = 0.75; // 慢速
+                utterance.pitch = 0.8; // 低沉
+            } else if (mode === 'brainwaves') {
+                utterance.rate = 0.95; // 正常偏慢，显稳重
+                utterance.pitch = 1.0; // 正常音调
+            } else {
+                utterance.rate = 0.9;
+                utterance.pitch = 1.0;
+            }
+
+            speechSynthesis.speak(utterance);
+        }
+
+        // 初始化加载声音列表（解决 Chrome 语音加载延迟的问题）
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = function() {
+                speechSynthesis.getVoices();
+            };
+        }
+    </script>
+</body>
+</html>
